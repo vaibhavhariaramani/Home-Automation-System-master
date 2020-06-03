@@ -1,85 +1,126 @@
-int var;
-#define r1 8
-#define r2 9
-#define r3 10
-#define r4 11
-int a,b,c,d;
-void setup()
-{
-  pinMode(r1,OUTPUT);
-  pinMode(r2,OUTPUT);
-  pinMode(r3,OUTPUT);
-  pinMode(r4,OUTPUT);
-  digitalWrite(r1,HIGH);
-  digitalWrite(r2,HIGH);
-  digitalWrite(r3,HIGH);
-  digitalWrite(r4,HIGH);
-a=1;
-b=1;
-c=1;
-d=1;
+//Vaibhav Hariramani (Geeky Bawa)
+// https://www.youtube.com/channel/UCy7amUpLnsRLEMIaJGGBYog
+//Google Assistant Home Automation
+#include <ESP8266WiFi.h>
+#include "Adafruit_MQTT.h"
+#include "Adafruit_MQTT_Client.h"
 
-  Serial.begin(9600);
- }
+#define Relay1            D1
+#define Relay2            D2
+#define Relay3            D3
+#define Relay4            D4
 
-  void loop()
-  {
-    if(Serial.available())
-    {
-      var=Serial.read();
-      switch(var)
-      {
-        case '1':
-        {
-        if(a!=0)
-        {
-        digitalWrite(r1,LOW);
-        a=0;
-        break;
-        }
-        else
-        {a=1;
-        digitalWrite(r1,HIGH);
-        break;
-        }
-        break;
-        }
+#define WLAN_SSID       "   ----   "             // Your SSID
+#define WLAN_PASS       "  ----  "        // Your password
 
-        case '2':{
-        if(b!=0){
-        digitalWrite(r2,LOW);
-        b=0;
-        break;
-        }
-        
-        else{
-          b=1;
-        digitalWrite(r2,HIGH);
-        break;
-        }}
-        
-        case '3':{
-        if(c!=0)
-        {c=0;
-        digitalWrite(r3,LOW);
-        break;
-        }
-        else 
-        {c=1;
-          digitalWrite(r3,HIGH);
-          break;
-          }}
-        case '4':{
-        if(d!=0)
-        {d=0;
-        digitalWrite(r4,LOW);
-        break;
-        }
-        else
-        {d=1;
-        digitalWrite(r4,HIGH);
-        break;
-          }
-        }}
-      }
+/************************* Adafruit.io Setup *********************************/
+
+#define AIO_SERVER      "io.adafruit.com" //Adafruit Server
+#define AIO_SERVERPORT  1883                   
+#define AIO_USERNAME    "   -----   "            // Username
+#define AIO_KEY         "      ------------      "   // Auth Key
+
+//WIFI CLIENT
+WiFiClient client;
+
+Adafruit_MQTT_Client mqtt(&client, AIO_SERVER, AIO_SERVERPORT, AIO_USERNAME, AIO_KEY);
+
+Adafruit_MQTT_Subscribe Light1 = Adafruit_MQTT_Subscribe(&mqtt, AIO_USERNAME"/feeds/Relay1"); // Feeds name should be same everywhere
+Adafruit_MQTT_Subscribe Light2 = Adafruit_MQTT_Subscribe(&mqtt, AIO_USERNAME "/feeds/Relay2");
+Adafruit_MQTT_Subscribe Light3 = Adafruit_MQTT_Subscribe(&mqtt, AIO_USERNAME "/feeds/Relay3");
+Adafruit_MQTT_Subscribe Light4 = Adafruit_MQTT_Subscribe(&mqtt, AIO_USERNAME "/feeds/Relay4");
+
+void MQTT_connect();
+
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(Relay1, OUTPUT);
+  pinMode(Relay2, OUTPUT);
+  pinMode(Relay3, OUTPUT);
+  pinMode(Relay4, OUTPUT);
+  
+  // Connect to WiFi access point.
+  Serial.println(); Serial.println();
+  Serial.print("Connecting to ");
+  Serial.println(WLAN_SSID);
+
+  WiFi.begin(WLAN_SSID, WLAN_PASS);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println();
+
+  Serial.println("WiFi connected");
+  Serial.println("IP address: "); 
+  Serial.println(WiFi.localIP());
+ 
+  mqtt.subscribe(&Light1);
+  mqtt.subscribe(&Light3);
+  mqtt.subscribe(&Light2);
+  mqtt.subscribe(&Light4);
+}
+
+void loop() {
+ 
+  MQTT_connect();
+  
+
+  Adafruit_MQTT_Subscribe *subscription;
+  while ((subscription = mqtt.readSubscription(20000))) {
+    if (subscription == &Light1) {
+      Serial.print(F("Got: "));
+      Serial.println((char *)Light1.lastread);
+      int Light1_State = atoi((char *)Light1.lastread);
+      digitalWrite(Relay1, Light1_State);
+      
     }
+    if (subscription == &Light2) {
+      Serial.print(F("Got: "));
+      Serial.println((char *)Light2.lastread);
+      int Light2_State = atoi((char *)Light2.lastread);
+      digitalWrite(Relay2, Light2_State);
+    }
+    if (subscription == &Light3) {
+      Serial.print(F("Got: "));
+      Serial.println((char *)Light3.lastread);
+      int Light3_State = atoi((char *)Light3.lastread);
+      digitalWrite(Relay3, Light3_State);
+    }
+    if (subscription == &Light4) {
+      Serial.print(F("Got: "));
+      Serial.println((char *)Light4.lastread);
+      int Light4_State = atoi((char *)Light4.lastread);
+      digitalWrite(Relay4, Light4_State);
+      
+    }
+  }
+
+  
+}
+
+void MQTT_connect() {
+  int8_t ret;
+
+  if (mqtt.connected()) {
+    return;
+  }
+
+  Serial.print("Connecting to MQTT... ");
+
+  uint8_t retries = 3;
+  
+  while ((ret = mqtt.connect()) != 0) {
+    Serial.println(mqtt.connectErrorString(ret));
+    Serial.println("Retrying MQTT connection in 5 seconds...");
+    mqtt.disconnect();
+    delay(5000); 
+    retries--;
+    if (retries == 0) {
+      while (1);
+    }
+  }
+  Serial.println("MQTT Connected!");
+  
+}
